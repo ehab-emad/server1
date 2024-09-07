@@ -64,11 +64,15 @@ updateDbWithImages();
 
 // مسار الجذر /
 app.get('/', (req, res) => {
-  res.send('Welcome to the image server. Use /images to see the list of images.');
+  if (fs.existsSync(dbFilePath)) {
+    res.sendFile(dbFilePath);
+  } else {
+    res.status(404).json({ error: 'db.json not found' });
+  }
 });
 
 // قراءة ملف db.json وعرض الصور
-app.get('./db.json', (req, res) => {
+app.get('/images', (req, res) => {
   if (fs.existsSync(dbFilePath)) {
     const db = JSON.parse(fs.readFileSync(dbFilePath));
     res.json(db.images);
@@ -81,3 +85,4 @@ app.get('./db.json', (req, res) => {
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
+
