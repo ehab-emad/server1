@@ -6,6 +6,13 @@ const fs = require('fs');
 const path = require('path');
 const cloudinary = require('cloudinary').v2;
 
+app.use(express.json()); // لدعم JSON في الطلبات
+app.use(cors());
+app.use((req, res, next) => {
+  res.setHeader('Connection', 'keep-alive');
+  next();
+});
+
 // إعدادات Cloudinary
 cloudinary.config({
   cloud_name: 'dxtbsifqn',
@@ -62,11 +69,7 @@ async function updateDbWithImages() {
 
 // تحديث db.json عند بدء التشغيل
 updateDbWithImages();
-app.use(cors());
-app.use((req, res, next) => {
-  res.setHeader('Connection', 'keep-alive');
-  next();
-});
+
 // مسار الجذر /
 app.get('/', (req, res) => {
   if (fs.existsSync(dbFilePath)) {
@@ -86,8 +89,83 @@ app.get('/images', (req, res) => {
   }
 });
 
+// إضافة صورة جديدة
+app.post('/images', async (req, res) => {
+  const { title, url } = req.body;
+
+  if (!title || !url) {
+    return res.status(400).json({ error: 'Title and URL are required' });
+  }
+
+  try {
+    let db = {};
+    if (fs.existsSync(dbFilePath)) {
+      db = JSON.parse(fs.readFileSync(dbFilePath));
+    } else {
+      db = { images: [] };
+    }
+
+    db.images.push({
+      id: db.images.length + 1, // تعيين ID جديد
+      title,
+      url
+    });
+
+    fs.writeFileSync(dbFilePath, JSON.stringify(db, null, 2));
+
+    res.status(201).json({ message: 'Image added successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error adding image' });
+  }
+});
+
+// حذف صورة
+app.delete('/images/:id', (req, res) => {
+  const { id } = req.params;
+
+  try {
+    let db = {};
+    if (fs.existsSync(dbFilePath)) {
+      db = JSON.parse(fs.readFileSync(dbFilePath));
+    } else {
+      db = { images: [] };
+    }
+
+    db.images = db.images.filter(image => image.id !== parseInt(id));
+
+    fs.writeFileSync(dbFilePath, JSON.stringify(db, null, 2));
+
+    res.json({ message: 'Image deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error deleting image' });
+  }
+});
+
+// جلب صورة بناءً على ID
+app.get('/images/:id', (req, res) => {
+  const { id } = req.params;
+
+  try {
+    let db = {};
+    if (fs.existsSync(dbFilePath)) {
+      db = JSON.parse(fs.readFileSync(dbFilePath));
+    } else {
+      db = { images: [] };
+    }
+
+    const image = db.images.find(img => img.id === parseInt(id));
+
+    if (image) {
+      res.json(image);
+    } else {
+      res.status(404).json({ error: 'Image not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching image' });
+  }
+});
+
 // بدء تشغيل الخادم
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
-
