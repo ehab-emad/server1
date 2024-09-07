@@ -5,6 +5,7 @@ const port = process.env.PORT || 3000;
 const fs = require('fs');
 const path = require('path');
 const cloudinary = require('cloudinary').v2;
+const multer = require('multer'); // مكتبة Multer لرفع الصور
 
 app.use(express.json()); // لدعم JSON في الطلبات
 app.use(cors());
@@ -19,6 +20,10 @@ cloudinary.config({
   api_key: '554486421733863',
   api_secret: 'B_wv1i5_3Jyi-ILLVYZhZrgvym8'
 });
+
+// إعداد Multer لرفع الملفات
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
 // مسار ملف db.json
 const dbFilePath = path.join(__dirname, 'db.json');
@@ -228,6 +233,39 @@ app.delete('/images/duplicates', async (req, res) => {
     console.error('Error deleting duplicate images:', error);
     res.status(500).json({ error: 'Error deleting duplicate images' });
   }
+});
+
+// رفع صورة إلى Cloudinary وتحديث db.json
+app.post('/upload', upload.single('image'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Please upload a file' });
+  }
+
+  // رفع الصورة إلى Cloudinary
+  cloudinary.uploader.upload_stream({ resource_type: 'image' }, (error, result) => {
+    if (error) {
+      console.error('Error uploading to Cloudinary:', error);
+      return res.status(500).json({ error: 'Error uploading image to Cloudinary' });
+    }
+
+    // تحديث db.json بالصورة المرفوعة
+    let db = {};
+    if (fs.existsSync(dbFilePath)) {
+      db = JSON.parse(fs.readFileSync(dbFilePath));
+    } else {
+      db = { images: [] };
+    }
+
+    db.images.push({
+      id: db.images.length + 1,
+      title: result.public_id,
+      url: result.secure_url
+    });
+
+    fs.writeFileSync(dbFilePath, JSON.stringify(db, null, 2));
+
+    res.status(201).json({ message: 'Image uploaded and saved successfully', imageUrl: result.secure_url });
+  }).end(req.file.buffer);
 });
 
 // بدء تشغيل الخادم
