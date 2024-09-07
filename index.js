@@ -63,7 +63,10 @@ async function updateDbWithImages() {
 // تحديث db.json عند بدء التشغيل
 updateDbWithImages();
 app.use(cors());
-
+app.use((req, res, next) => {
+  res.setHeader('Connection', 'keep-alive');
+  next();
+});
 // مسار الجذر /
 app.get('/', (req, res) => {
   if (fs.existsSync(dbFilePath)) {
