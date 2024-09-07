@@ -63,7 +63,7 @@ async function updateDbWithImages() {
 updateDbWithImages();
 
 // مسار الجذر /
-app.get('/', (req, res) => {
+app.get('db.json', (req, res) => {
   res.send('Welcome to the image server. Use /images to see the list of images.');
 });
 
