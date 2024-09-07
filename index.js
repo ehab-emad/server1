@@ -63,12 +63,12 @@ async function updateDbWithImages() {
 updateDbWithImages();
 
 // مسار الجذر /
-app.get('db.json', (req, res) => {
+app.get('/', (req, res) => {
   res.send('Welcome to the image server. Use /images to see the list of images.');
 });
 
 // قراءة ملف db.json وعرض الصور
-app.get('/images', (req, res) => {
+app.get('./db.json', (req, res) => {
   if (fs.existsSync(dbFilePath)) {
     const db = JSON.parse(fs.readFileSync(dbFilePath));
     res.json(db.images);
