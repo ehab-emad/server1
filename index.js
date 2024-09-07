@@ -1,4 +1,8 @@
+const express = require('express');
+const app = express();
+const port = process.env.PORT || 3000;
 const fs = require('fs');
+const path = require('path');
 const cloudinary = require('cloudinary').v2;
 
 // إعدادات Cloudinary
@@ -9,7 +13,7 @@ cloudinary.config({
 });
 
 // مسار ملف db.json
-const dbFilePath = 'db.json';
+const dbFilePath = path.join(__dirname, 'db.json');
 
 // دالة للحصول على قائمة الصور من Cloudinary
 function fetchImageList() {
@@ -55,5 +59,20 @@ async function updateDbWithImages() {
   }
 }
 
-// تشغيل دالة التحديث
+// تحديث db.json عند بدء التشغيل
 updateDbWithImages();
+
+// قراءة ملف db.json وعرض الصور
+app.get('/images', (req, res) => {
+  if (fs.existsSync(dbFilePath)) {
+    const db = JSON.parse(fs.readFileSync(dbFilePath));
+    res.json(db.images);
+  } else {
+    res.status(404).json({ error: 'db.json not found' });
+  }
+});
+
+// بدء تشغيل الخادم
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
