@@ -24,7 +24,7 @@ cloudinary.config({
 const dbFilePath = path.join(__dirname, 'db.json');
 
 // دالة للحصول على قائمة الصور من Cloudinary
-function fetchImageList() {
+async function fetchImageList() {
   return new Promise((resolve, reject) => {
     cloudinary.api.resources({ type: 'upload', max_results: 100 }, (error, result) => {
       if (error) {
@@ -179,6 +179,54 @@ app.get('/images/:id', (req, res) => {
     }
   } catch (error) {
     res.status(500).json({ error: 'Error fetching image' });
+  }
+});
+
+// حذف الصور المتشابهة
+app.delete('/images/duplicates', async (req, res) => {
+  try {
+    const images = await fetchImageList();
+
+    // تصفية الصور المتشابهة بناءً على public_id
+    const uniqueImages = {};
+    images.forEach(image => {
+      if (!uniqueImages[image.public_id]) {
+        uniqueImages[image.public_id] = image;
+      }
+    });
+
+    const duplicateImages = images.filter(image => {
+      return images.some(img => img.public_id === image.public_id && img !== image);
+    });
+
+    for (const image of duplicateImages) {
+      // حذف الصورة من Cloudinary
+      await new Promise((resolve, reject) => {
+        cloudinary.uploader.destroy(image.public_id, (error, result) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(result);
+          }
+        });
+      });
+
+      // حذف الصورة من db.json
+      let db = {};
+      if (fs.existsSync(dbFilePath)) {
+        db = JSON.parse(fs.readFileSync(dbFilePath));
+      } else {
+        db = { images: [] };
+      }
+
+      db.images = db.images.filter(img => img.title !== image.public_id);
+      fs.writeFileSync(dbFilePath, JSON.stringify(db, null, 2));
+    }
+
+    res.json({ message: 'Duplicate images deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting duplicate images:', error);
+    res.status(500).json({ error: 'Error deleting duplicate images' });
   }
 });
 
