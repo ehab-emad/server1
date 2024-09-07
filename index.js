@@ -62,6 +62,11 @@ async function updateDbWithImages() {
 // تحديث db.json عند بدء التشغيل
 updateDbWithImages();
 
+// مسار الجذر /
+app.get('/', (req, res) => {
+  res.send('Welcome to the image server. Use /images to see the list of images.');
+});
+
 // قراءة ملف db.json وعرض الصور
 app.get('/images', (req, res) => {
   if (fs.existsSync(dbFilePath)) {
