@@ -1,5 +1,6 @@
 const express = require('express');
 const app = express();
+const cors = require('cors'); // استيراد مكتبة CORS
 const port = process.env.PORT || 3000;
 const fs = require('fs');
 const path = require('path');
@@ -61,6 +62,7 @@ async function updateDbWithImages() {
 
 // تحديث db.json عند بدء التشغيل
 updateDbWithImages();
+app.use(cors());
 
 // مسار الجذر /
 app.get('/', (req, res) => {
