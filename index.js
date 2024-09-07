@@ -120,7 +120,7 @@ app.post('/images', async (req, res) => {
 });
 
 // حذف صورة
-app.delete('/images/:id', (req, res) => {
+app.delete('/images/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -131,12 +131,29 @@ app.delete('/images/:id', (req, res) => {
       db = { images: [] };
     }
 
-    db.images = db.images.filter(image => image.id !== parseInt(id));
+    const imageIndex = db.images.findIndex(image => image.id === parseInt(id));
+    
+    if (imageIndex === -1) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
 
-    fs.writeFileSync(dbFilePath, JSON.stringify(db, null, 2));
+    const image = db.images[imageIndex];
+    
+    // حذف الصورة من Cloudinary
+    cloudinary.uploader.destroy(image.title, (error, result) => {
+      if (error) {
+        console.error(`Cloudinary error: ${error.message}`);
+        return res.status(500).json({ error: 'Error deleting image from Cloudinary' });
+      }
 
-    res.json({ message: 'Image deleted successfully' });
+      // حذف الصورة من db.json
+      db.images.splice(imageIndex, 1);
+      fs.writeFileSync(dbFilePath, JSON.stringify(db, null, 2));
+
+      res.json({ message: 'Image deleted successfully' });
+    });
   } catch (error) {
+    console.error('Error deleting image:', error);
     res.status(500).json({ error: 'Error deleting image' });
   }
 });
