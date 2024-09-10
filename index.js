@@ -15,11 +15,19 @@ app.use((req, res, next) => {
 });
 
 // إعداد Multer لرفع الملفات
-const storage = multer.memoryStorage();
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'images'); // تعيين مجلد لتخزين الصور
+  },
+  filename: function (req, file, cb) {
+    cb(null, file.originalname); // تعيين اسم الصورة عند رفعها
+  }
+});
 const upload = multer({ storage });
 
 // مسار ملف db.json
 const dbFilePath = path.join(__dirname, 'db.json');
+const imagesFolderPath = path.join(__dirname, 'images');
 
 // إنشاء مجلد النسخ الاحتياطية
 const backupFolderPath = path.join(__dirname, 'backup');
@@ -46,17 +54,14 @@ cron.schedule('0 0 * * *', () => {
   createBackup();
 });
 
-// إعداد مسار لخدمة الصور الثابتة
-app.use('/images', express.static(path.join(__dirname, 'images')));
-
 // قراءة ملف db.json وعرض الصور
 app.get('/images', (req, res) => {
   if (fs.existsSync(dbFilePath)) {
     const db = JSON.parse(fs.readFileSync(dbFilePath));
-    // تحويل المسار إلى URL كامل إذا كان مسار محلي
+    // تحويل المسارات النسبية إلى URLs كاملة
     const imagesWithFullUrl = db.images.map(image => ({
       id: image.id,
-      url: image.url // استخدام URL من db.json مباشرة
+      url: `${req.protocol}://${req.get('host')}/images/${path.basename(image.images)}` // بناء الرابط الكامل للصورة
     }));
     res.json(imagesWithFullUrl);
   } else {
@@ -66,10 +71,10 @@ app.get('/images', (req, res) => {
 
 // إضافة صورة جديدة
 app.post('/images', (req, res) => {
-  const { title, url } = req.body;
+  const { id, url } = req.body;
 
-  if (!title || !url) {
-    return res.status(400).json({ error: 'Title and URL are required' });
+  if (!id || !url) {
+    return res.status(400).json({ error: 'ID and URL are required' });
   }
 
   try {
@@ -81,9 +86,8 @@ app.post('/images', (req, res) => {
     }
 
     db.images.push({
-      id: db.images.length + 1, // تعيين ID جديد
-      title,
-      url
+      id: parseInt(id), // تعيين ID جديد
+      images: url
     });
 
     fs.writeFileSync(dbFilePath, JSON.stringify(db, null, 2));
@@ -129,8 +133,7 @@ app.post('/upload', upload.single('image'), (req, res) => {
     return res.status(400).json({ error: 'Please upload a file' });
   }
 
-  // لتحويل الصورة إلى Base64
-  const imageUrl = `data:image/png;base64,${req.file.buffer.toString('base64')}`;
+  const imageUrl = `${req.protocol}://${req.get('host')}/images/${req.file.filename}`;
 
   try {
     let db = {};
@@ -140,10 +143,11 @@ app.post('/upload', upload.single('image'), (req, res) => {
       db = { images: [] };
     }
 
+    const newId = db.images.length ? db.images[db.images.length - 1].id + 1 : 1;
+
     db.images.push({
-      id: db.images.length + 1,
-      title: req.file.originalname,
-      url: imageUrl
+      id: newId,
+      images: req.file.filename
     });
 
     fs.writeFileSync(dbFilePath, JSON.stringify(db, null, 2));
@@ -154,6 +158,9 @@ app.post('/upload', upload.single('image'), (req, res) => {
     res.status(500).json({ error: 'Error uploading image' });
   }
 });
+
+// تقديم ملفات الصور
+app.use('/images', express.static(imagesFolderPath));
 
 // بدء تشغيل الخادم
 app.listen(port, () => {
