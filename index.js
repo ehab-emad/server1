@@ -46,11 +46,19 @@ cron.schedule('0 0 * * *', () => {
   createBackup();
 });
 
+// إعداد مسار لخدمة الصور الثابتة
+app.use('/images', express.static(path.join(__dirname, 'images')));
+
 // قراءة ملف db.json وعرض الصور
 app.get('/images', (req, res) => {
   if (fs.existsSync(dbFilePath)) {
     const db = JSON.parse(fs.readFileSync(dbFilePath));
-    res.json(db.images);
+    // تحويل المسار إلى URL كامل إذا كان مسار محلي
+    const imagesWithFullUrl = db.images.map(image => ({
+      id: image.id,
+      url: image.url // استخدام URL من db.json مباشرة
+    }));
+    res.json(imagesWithFullUrl);
   } else {
     res.status(404).json({ error: 'db.json not found' });
   }
@@ -121,7 +129,7 @@ app.post('/upload', upload.single('image'), (req, res) => {
     return res.status(400).json({ error: 'Please upload a file' });
   }
 
-  // لتجنب رفع الصور إلى Cloudinary، نقوم مباشرة بتحديث db.json
+  // لتحويل الصورة إلى Base64
   const imageUrl = `data:image/png;base64,${req.file.buffer.toString('base64')}`;
 
   try {
