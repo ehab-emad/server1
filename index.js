@@ -32,7 +32,7 @@ const backupFilePath = path.join(__dirname, 'db-backup.json');
 // دالة للحصول على قائمة الصور من Cloudinary
 async function fetchImageList() {
   return new Promise((resolve, reject) => {
-    cloudinary.api.resources({ type: 'upload', max_results: 100 }, (error, result) => {
+    cloudinary.api.resources({ type: 'upload', max_results: 1000 }, (error, result) => {
       if (error) {
         reject(error);
       } else {
