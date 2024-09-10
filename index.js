@@ -25,7 +25,7 @@ cloudinary.config({
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-// مسار ملفات db
+// مسار ملف db.json ونسخة احتياطية
 const dbFilePath = path.join(__dirname, 'db.json');
 const backupFilePath = path.join(__dirname, 'db-backup.json');
 
@@ -52,17 +52,17 @@ function backupDb() {
   }
 }
 
-// دالة لاستعادة النسخة الاحتياطية
-function restoreDbFromBackup() {
+// دالة لاستعادة البيانات من النسخة الاحتياطية
+function restoreFromBackup() {
   if (fs.existsSync(backupFilePath)) {
     fs.copyFileSync(backupFilePath, dbFilePath);
-    console.log('Restored db.json from backup.');
+    console.log('Restored from backup.');
   } else {
     console.error('No backup file found to restore.');
   }
 }
 
-// تحديث db.json بالصور من Cloudinary
+// تحديث db.json بالصور
 async function updateDbWithImages() {
   try {
     const images = await fetchImageList();
@@ -95,10 +95,12 @@ async function updateDbWithImages() {
 }
 
 // تحديث db.json عند بدء التشغيل
-if (!fs.existsSync(dbFilePath)) {
+if (fs.existsSync(dbFilePath)) {
+  console.log('Database file exists.');
   updateDbWithImages();
 } else {
-  console.log('db.json already exists. Skipping initial update.');
+  console.log('Database file not found, restoring from backup.');
+  restoreFromBackup();
 }
 
 // مسار الجذر /
@@ -277,4 +279,28 @@ app.post('/upload', upload.single('image'), (req, res) => {
       return res.status(500).json({ error: 'Error uploading image to Cloudinary' });
     }
 
-    // تحديث db.json بالصورة
+    // تحديث db.json بالصورة المرفوعة
+    let db = {};
+    if (fs.existsSync(dbFilePath)) {
+      db = JSON.parse(fs.readFileSync(dbFilePath));
+    } else {
+      db = { images: [] };
+    }
+
+    db.images.push({
+      id: db.images.length + 1,
+      title: result.public_id,
+      url: result.secure_url
+    });
+
+    fs.writeFileSync(dbFilePath, JSON.stringify(db, null, 2));
+    backupDb(); // عمل نسخة احتياطية بعد التحديث
+
+    res.status(201).json({ message: 'Image uploaded and saved successfully', imageUrl: result.secure_url });
+  }).end(req.file.buffer);
+});
+
+// بدء تشغيل الخادم
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
