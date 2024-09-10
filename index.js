@@ -58,9 +58,12 @@ async function updateDbWithImages() {
       db = { images: [] };
     }
 
+    // تحديد أقصى ID موجود حالياً في db.json
+    const maxId = db.images.reduce((max, image) => Math.max(max, image.id), 0);
+
     // إضافة الصور إلى db.json
-    db.images = images.map(image => ({
-      id: image.public_id,
+    db.images = images.map((image, index) => ({
+      id: maxId + index + 1, // تعيين ID جديد
       title: image.public_id,
       url: image.secure_url
     }));
@@ -140,7 +143,7 @@ app.delete('/images/:id', async (req, res) => {
       db = { images: [] };
     }
 
-    const imageIndex = db.images.findIndex(image => image.id === id);
+    const imageIndex = db.images.findIndex(image => image.id === parseInt(id));
 
     if (imageIndex === -1) {
       return res.status(404).json({ error: 'Image not found' });
@@ -180,7 +183,7 @@ app.get('/images/:id', (req, res) => {
       db = { images: [] };
     }
 
-    const image = db.images.find(img => img.id === id);
+    const image = db.images.find(img => img.id === parseInt(id));
 
     if (image) {
       res.json(image);
@@ -214,7 +217,7 @@ app.post('/upload', upload.single('image'), (req, res) => {
     }
 
     db.images.push({
-      id: result.public_id,
+      id: db.images.length + 1, // تعيين ID جديد
       title: result.public_id,
       url: result.secure_url
     });
@@ -227,6 +230,27 @@ app.post('/upload', upload.single('image'), (req, res) => {
 });
 
 // بدء تشغيل الخادم
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
+  // عمل نسخة احتياطية عند بدء التشغيل
+  backupDb();
+});
+
+// إيقاف السيرفر مع عمل نسخة احتياطية
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  backupDb();
+  server.close(() => {
+    console.log('HTTP server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT signal received: closing HTTP server');
+  backupDb();
+  server.close(() => {
+    console.log('HTTP server closed');
+    process.exit(0);
+  });
 });
