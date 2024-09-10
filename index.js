@@ -1,13 +1,13 @@
 const express = require('express');
 const app = express();
-const cors = require('cors'); // استيراد مكتبة CORS
+const cors = require('cors');
 const port = process.env.PORT || 3000;
 const fs = require('fs');
 const path = require('path');
 const cloudinary = require('cloudinary').v2;
-const multer = require('multer'); // مكتبة Multer لرفع الصور
+const multer = require('multer');
 
-app.use(express.json()); // لدعم JSON في الطلبات
+app.use(express.json());
 app.use(cors());
 app.use((req, res, next) => {
   res.setHeader('Connection', 'keep-alive');
@@ -62,32 +62,26 @@ function restoreFromBackup() {
   }
 }
 
-// تحديث db.json بالصور
+// تحديث db.json بالصور من Cloudinary
 async function updateDbWithImages() {
   try {
     const images = await fetchImageList();
-
-    // قراءة محتويات db.json
-    let db = {};
+    
+    let db = { images: [] };
     if (fs.existsSync(dbFilePath)) {
       db = JSON.parse(fs.readFileSync(dbFilePath));
-    } else {
-      db = { images: [] };
     }
-
-    // إضافة الصور إلى db.json
+    
     images.forEach(image => {
       db.images.push({
-        id: db.images.length + 1, // تعيين ID جديد
-        title: image.public_id,   // عنوان الصورة (يمكن تعديله حسب الحاجة)
-        url: image.secure_url     // رابط الصورة
+        id: db.images.length + 1,
+        title: image.public_id,
+        url: image.secure_url
       });
     });
 
-    // كتابة التحديثات إلى db.json
     fs.writeFileSync(dbFilePath, JSON.stringify(db, null, 2));
-    backupDb(); // عمل نسخة احتياطية بعد التحديث
-
+    backupDb();
     console.log('db.json updated with image URLs.');
   } catch (error) {
     console.error('Error updating db.json:', error);
@@ -95,11 +89,11 @@ async function updateDbWithImages() {
 }
 
 // تحديث db.json عند بدء التشغيل
-if (fs.existsSync(dbFilePath)) {
-  console.log('Database file exists.');
+if (!fs.existsSync(dbFilePath)) {
+  console.log('Database file not found, updating from Cloudinary.');
   updateDbWithImages();
 } else {
-  console.log('Database file not found, restoring from backup.');
+  console.log('Database file exists. Restoring from backup if available.');
   restoreFromBackup();
 }
 
@@ -139,13 +133,13 @@ app.post('/images', async (req, res) => {
     }
 
     db.images.push({
-      id: db.images.length + 1, // تعيين ID جديد
+      id: db.images.length + 1,
       title,
       url
     });
 
     fs.writeFileSync(dbFilePath, JSON.stringify(db, null, 2));
-    backupDb(); // عمل نسخة احتياطية بعد التحديث
+    backupDb();
 
     res.status(201).json({ message: 'Image added successfully' });
   } catch (error) {
@@ -173,17 +167,15 @@ app.delete('/images/:id', async (req, res) => {
 
     const image = db.images[imageIndex];
     
-    // حذف الصورة من Cloudinary
     cloudinary.uploader.destroy(image.title, (error, result) => {
       if (error) {
         console.error(`Cloudinary error: ${error.message}`);
         return res.status(500).json({ error: 'Error deleting image from Cloudinary' });
       }
 
-      // حذف الصورة من db.json
       db.images.splice(imageIndex, 1);
       fs.writeFileSync(dbFilePath, JSON.stringify(db, null, 2));
-      backupDb(); // عمل نسخة احتياطية بعد التحديث
+      backupDb();
 
       res.json({ message: 'Image deleted successfully' });
     });
@@ -222,7 +214,6 @@ app.delete('/images/duplicates', async (req, res) => {
   try {
     const images = await fetchImageList();
 
-    // تصفية الصور المتشابهة بناءً على public_id
     const uniqueImages = {};
     images.forEach(image => {
       if (!uniqueImages[image.public_id]) {
@@ -235,7 +226,6 @@ app.delete('/images/duplicates', async (req, res) => {
     });
 
     for (const image of duplicateImages) {
-      // حذف الصورة من Cloudinary
       await new Promise((resolve, reject) => {
         cloudinary.uploader.destroy(image.public_id, (error, result) => {
           if (error) {
@@ -246,7 +236,6 @@ app.delete('/images/duplicates', async (req, res) => {
         });
       });
 
-      // حذف الصورة من db.json
       let db = {};
       if (fs.existsSync(dbFilePath)) {
         db = JSON.parse(fs.readFileSync(dbFilePath));
@@ -256,7 +245,7 @@ app.delete('/images/duplicates', async (req, res) => {
 
       db.images = db.images.filter(img => img.title !== image.public_id);
       fs.writeFileSync(dbFilePath, JSON.stringify(db, null, 2));
-      backupDb(); // عمل نسخة احتياطية بعد التحديث
+      backupDb();
     }
 
     res.json({ message: 'Duplicate images deleted successfully' });
@@ -272,14 +261,12 @@ app.post('/upload', upload.single('image'), (req, res) => {
     return res.status(400).json({ error: 'Please upload a file' });
   }
 
-  // رفع الصورة إلى Cloudinary
   cloudinary.uploader.upload_stream({ resource_type: 'image' }, (error, result) => {
     if (error) {
       console.error('Error uploading to Cloudinary:', error);
       return res.status(500).json({ error: 'Error uploading image to Cloudinary' });
     }
 
-    // تحديث db.json بالصورة المرفوعة
     let db = {};
     if (fs.existsSync(dbFilePath)) {
       db = JSON.parse(fs.readFileSync(dbFilePath));
@@ -294,7 +281,7 @@ app.post('/upload', upload.single('image'), (req, res) => {
     });
 
     fs.writeFileSync(dbFilePath, JSON.stringify(db, null, 2));
-    backupDb(); // عمل نسخة احتياطية بعد التحديث
+    backupDb();
 
     res.status(201).json({ message: 'Image uploaded and saved successfully', imageUrl: result.secure_url });
   }).end(req.file.buffer);
