@@ -16,9 +16,9 @@ app.use((req, res, next) => {
 
 // إعدادات Cloudinary
 cloudinary.config({
-  cloud_name: 'dxtbsifqn',
-  api_key: '554486421733863',
-  api_secret: 'B_wv1i5_3Jyi-ILLVYZhZrgvym8'
+  cloud_name: 'dmiugz4v6',
+  api_key: '162966922949736',
+  api_secret: 'LVnSbLArbqk7lTJvIIPweV-f6c0'
 });
 
 // إعداد Multer لرفع الملفات
